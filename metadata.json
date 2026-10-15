@@ -1,0 +1,6 @@
+{
+  "name": "おえかき しりとり！",
+  "description": "スマホを順番に手渡してえでしりとりをつなげるパーティーおえかきPWAゲーム。16色パレットやクラッカー演出、履歴機能付き。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
