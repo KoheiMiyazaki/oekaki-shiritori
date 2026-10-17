@@ -44,7 +44,7 @@ export const PWAInstallButton: React.FC = () => {
               <div className="flex items-center justify-between pb-3 border-b border-gray-100">
                 <div className="flex items-center gap-2">
                   <img
-                    src="/app-icon.jpg"
+                    src="./app-icon.jpg"
                     alt="おえかき しりとり！ アイコン"
                     className="w-8 h-8 rounded-lg shadow-xs object-cover"
                     referrerPolicy="no-referrer"

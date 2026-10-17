@@ -44,11 +44,13 @@ export default function App() {
   const [canUndo, setCanUndo] = useState<boolean>(false);
   const [canRedo, setCanRedo] = useState<boolean>(false);
 
-  // Initialize state: Clear history every time the app loads as requested
+  // Initialize state: Preserve history across app sessions; load existing history and turn
   useEffect(() => {
-    storage.clearHistory();
-    setHistory([]);
-    setTurn(1);
+    const loadedHistory = storage.getHistory();
+    setHistory(loadedHistory);
+
+    const savedTurn = storage.getCurrentTurn();
+    setTurn(savedTurn);
 
     const loadedCustomColors = storage.getCustomColors();
     setCustomColors(loadedCustomColors);

@@ -32,6 +32,14 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
 
   const storageKB = storage.getStorageUsageKB();
 
+  // Sort history in descending order of creation time (newest first)
+  const sortedHistory = [...history].sort((a, b) => {
+    if (b.timestamp !== a.timestamp) {
+      return (b.timestamp || 0) - (a.timestamp || 0);
+    }
+    return (b.turn || 0) - (a.turn || 0);
+  });
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in duration-200">
       <div className="w-full max-w-md h-[90vh] max-h-[750px] rounded-3xl bg-amber-50/95 shadow-2xl border-4 border-amber-300 flex flex-col overflow-hidden text-slate-800 animate-in zoom-in-95 duration-200">
@@ -45,12 +53,17 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
               <h2 className="text-base font-black text-amber-950 flex items-center gap-1.5">
                 <span>しりとりのりれき</span>
                 <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-800 font-bold">
-                  {history.length}まい
+                  {history.length} / 100まい
                 </span>
               </h2>
               <div className="flex items-center gap-2 text-[11px] text-slate-500">
-                <HardDrive className="w-3 h-3 text-amber-600" />
-                <span>データ使用量: 約 {storageKB} KB</span>
+                <span className="font-bold text-amber-800 bg-amber-100/90 px-1.5 py-0.5 rounded-md text-[10px]">
+                  あたらしい じゅん
+                </span>
+                <span className="flex items-center gap-1">
+                  <HardDrive className="w-3 h-3 text-amber-600" />
+                  <span>約 {storageKB} KB</span>
+                </span>
               </div>
             </div>
           </div>
@@ -66,7 +79,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
 
         {/* Scrollable Timeline */}
         <div className="flex-1 overflow-y-auto p-4 space-y-4 history-scroll">
-          {history.length === 0 ? (
+          {sortedHistory.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-500">
               <div className="w-16 h-16 rounded-3xl bg-amber-100/80 flex items-center justify-center mb-3 text-2xl shadow-inner">
                 🎨
@@ -78,7 +91,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
             </div>
           ) : (
             <div className="space-y-4 relative">
-              {history.map((record, index) => {
+              {sortedHistory.map((record, index) => {
                 const dateStr = new Date(record.timestamp).toLocaleTimeString([], {
                   hour: '2-digit',
                   minute: '2-digit',
@@ -86,12 +99,12 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
 
                 return (
                   <div key={record.id} className="relative">
-                    {/* Downward connecting chain arrow */}
+                    {/* Downward connecting chain arrow indicating previous/older drawing */}
                     {index > 0 && (
-                      <div className="flex items-center justify-center -my-2.5 mb-1 text-orange-400">
-                        <div className="flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-white/90 shadow-xs border border-orange-200 text-[10px] font-bold text-orange-600">
-                          <ArrowDown className="w-3 h-3 animate-bounce" />
-                          <span>しりとり バトンタッチ！</span>
+                      <div className="flex items-center justify-center -my-2.5 mb-1 text-amber-500">
+                        <div className="flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-white/95 shadow-xs border border-amber-200 text-[10px] font-bold text-amber-700">
+                          <ArrowDown className="w-3 h-3 text-amber-500" />
+                          <span>ひとつ まえの え</span>
                         </div>
                       </div>
                     )}
@@ -106,6 +119,11 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                           <span className="text-xs font-black text-amber-950">
                             {record.turn}つめ の え
                           </span>
+                          {index === 0 && (
+                            <span className="px-1.5 py-0.5 rounded-md bg-gradient-to-r from-orange-500 to-amber-500 text-white text-[9px] font-black shadow-xs">
+                              さいしん
+                            </span>
+                          )}
                           <span className="text-[10px] text-slate-400 font-medium">
                             {dateStr}
                           </span>

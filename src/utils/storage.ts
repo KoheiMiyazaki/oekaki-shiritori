@@ -9,6 +9,8 @@ export interface DrawingRecord {
   artistNote?: string;
 }
 
+export const MAX_HISTORY_ITEMS = 100;
+
 const HISTORY_KEY = 'oekaki_shiritori_history_v1';
 const CUSTOM_COLORS_KEY = 'oekaki_shiritori_custom_colors_v1';
 const CURRENT_TURN_KEY = 'oekaki_shiritori_current_turn_v1';
@@ -24,11 +26,33 @@ export const storage = {
     }
   },
 
+  safeSaveHistory(items: DrawingRecord[]): void {
+    let toSave = items;
+    while (toSave.length > 0) {
+      try {
+        localStorage.setItem(HISTORY_KEY, JSON.stringify(toSave));
+        return;
+      } catch (e) {
+        // If quota exceeded, silently drop the oldest item and retry
+        if (toSave.length > 1) {
+          toSave = toSave.slice(1);
+        } else {
+          console.error('Storage quota exceeded, unable to save', e);
+          break;
+        }
+      }
+    }
+  },
+
   saveDrawing(record: DrawingRecord): DrawingRecord[] {
     try {
       const current = this.getHistory();
-      const updated = [...current, record];
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+      let updated = [...current, record];
+      // Limit to 100 items: automatically prune oldest items silently
+      if (updated.length > MAX_HISTORY_ITEMS) {
+        updated = updated.slice(updated.length - MAX_HISTORY_ITEMS);
+      }
+      this.safeSaveHistory(updated);
       return updated;
     } catch (e) {
       console.error('Failed to save drawing', e);
@@ -40,7 +64,7 @@ export const storage = {
     try {
       const current = this.getHistory();
       const updated = current.filter((item) => item.id !== id);
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+      this.safeSaveHistory(updated);
       return updated;
     } catch (e) {
       console.error('Failed to delete drawing', e);
@@ -65,7 +89,11 @@ export const storage = {
         if (!isNaN(parsed) && parsed > 0) return parsed;
       }
       const history = this.getHistory();
-      return history.length + 1;
+      if (history.length > 0) {
+        const maxTurn = Math.max(...history.map((h) => h.turn || 0));
+        return maxTurn + 1;
+      }
+      return 1;
     } catch {
       return 1;
     }

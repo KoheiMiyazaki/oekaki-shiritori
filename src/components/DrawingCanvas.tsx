@@ -423,7 +423,7 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>
         const canvas = canvasRef.current;
         if (!canvas || canvas.width === 0 || canvas.height === 0) return '';
 
-        const maxDim = 360;
+        const maxDim = 320;
         let thumbWidth = canvas.width;
         let thumbHeight = canvas.height;
 
@@ -450,14 +450,14 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>
         offCtx.drawImage(canvas, 0, 0, thumbWidth, thumbHeight);
 
         try {
-          const webp = offscreen.toDataURL('image/webp', 0.72);
+          const webp = offscreen.toDataURL('image/webp', 0.70);
           if (webp.startsWith('data:image/webp')) {
             return webp;
           }
         } catch {
           // Fall back
         }
-        return offscreen.toDataURL('image/jpeg', 0.72);
+        return offscreen.toDataURL('image/jpeg', 0.70);
       },
 
       getHighResDataURL: () => {

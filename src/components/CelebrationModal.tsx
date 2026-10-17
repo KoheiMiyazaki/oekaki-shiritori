@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import confetti from 'canvas-confetti';
-import { Sparkles, ArrowRight, HeartHandshake } from 'lucide-react';
+import { Sparkles, ArrowRight } from 'lucide-react';
 import { sound } from '../utils/audio';
 
 interface CelebrationModalProps {
@@ -135,16 +135,8 @@ export const CelebrationModal: React.FC<CelebrationModalProps> = ({
           )}
         </div>
 
-        {/* Handover Notice */}
-        <div className="my-4 p-3.5 rounded-2xl bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 text-center">
-          <div className="flex items-center justify-center gap-1.5 text-sm font-black text-orange-900">
-            <HeartHandshake className="w-5 h-5 text-orange-500" />
-            <span>スマホを次のひとにわたしてね</span>
-          </div>
-        </div>
-
         {/* Action Buttons */}
-        <div className="space-y-2 pt-1">
+        <div className="space-y-2 pt-3">
           <button
             type="button"
             onClick={handleNext}
