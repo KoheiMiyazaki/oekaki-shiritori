@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   History,
@@ -27,6 +27,18 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
 }) => {
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [zoomedImage, setZoomedImage] = useState<DrawingRecord | null>(null);
+
+  // Sync zoomedImage if records are deleted or renumbered
+  useEffect(() => {
+    if (zoomedImage) {
+      const updated = history.find((h) => h.id === zoomedImage.id);
+      if (updated) {
+        setZoomedImage(updated);
+      } else {
+        setZoomedImage(null);
+      }
+    }
+  }, [history]);
 
   if (!isOpen) return null;
 

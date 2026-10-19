@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
-import { Palette, Plus, Trash2, Check, Eraser } from 'lucide-react';
+import { Palette, Plus, Trash2, Check, Eraser, PaintBucket } from 'lucide-react';
 
 interface ColorPaletteProps {
   currentColor: string;
   isEraser: boolean;
+  isFill: boolean;
   brushSize: number;
   customColors: string[];
   onSelectColor: (color: string) => void;
   onToggleEraser: () => void;
+  onToggleFill: () => void;
   onSelectBrushSize: (size: number) => void;
   onAddCustomColor: (color: string) => void;
   onRemoveCustomColor: (color: string) => void;
@@ -48,10 +50,12 @@ export const BRUSH_SIZES = [
 export const ColorPalette: React.FC<ColorPaletteProps> = ({
   currentColor,
   isEraser,
+  isFill,
   brushSize,
   customColors,
   onSelectColor,
   onToggleEraser,
+  onToggleFill,
   onSelectBrushSize,
   onAddCustomColor,
   onRemoveCustomColor,
@@ -101,10 +105,24 @@ export const ColorPalette: React.FC<ColorPaletteProps> = ({
             <Eraser className="w-4 h-4" />
           </button>
 
+          {/* 塗りつぶしボタン（バケツマーク） */}
+          <button
+            onClick={onToggleFill}
+            className={`flex items-center justify-center w-8 h-8 rounded-xl transition-all active:scale-90 ${
+              isFill
+                ? 'bg-amber-500 text-white shadow-xs scale-105'
+                : 'text-slate-600 hover:bg-amber-50'
+            }`}
+            title="ぬりつぶし"
+            aria-label="ぬりつぶし"
+          >
+            <PaintBucket className="w-4 h-4" />
+          </button>
+
           <div className="w-4 h-px bg-amber-200 my-0.5" />
 
           {BRUSH_SIZES.map((b) => {
-            const isSelected = !isEraser && brushSize === b.size;
+            const isSelected = !isEraser && !isFill && brushSize === b.size;
             return (
               <button
                 key={b.size}

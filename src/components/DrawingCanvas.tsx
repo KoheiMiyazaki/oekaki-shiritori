@@ -21,6 +21,7 @@ export interface DrawingCanvasHandle {
 interface DrawingCanvasProps {
   currentColor: string;
   isEraser: boolean;
+  isFill?: boolean;
   brushSize: number;
   onStrokeChange?: (canUndo: boolean, canRedo: boolean) => void;
 }
@@ -31,7 +32,7 @@ interface Point {
 }
 
 export const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>(
-  ({ currentColor, isEraser, brushSize, onStrokeChange }, ref) => {
+  ({ currentColor, isEraser, isFill = false, brushSize, onStrokeChange }, ref) => {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
     const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -43,6 +44,7 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>
     // Current tool settings stored in refs for direct event listener access
     const currentColorRef = useRef(currentColor);
     const isEraserRef = useRef(isEraser);
+    const isFillRef = useRef(isFill);
     const brushSizeRef = useRef(brushSize);
     const onStrokeChangeRef = useRef(onStrokeChange);
 
@@ -53,6 +55,10 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>
     useEffect(() => {
       isEraserRef.current = isEraser;
     }, [isEraser]);
+
+    useEffect(() => {
+      isFillRef.current = isFill;
+    }, [isFill]);
 
     useEffect(() => {
       brushSizeRef.current = brushSize;
@@ -273,6 +279,177 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>
       pushHistorySnapshot();
     };
 
+    // Convert color hex to RGBA
+    const hexToRgba = (hex: string): [number, number, number, number] => {
+      let c = hex.replace('#', '').trim();
+      if (c.length === 3) {
+        c = c.split('').map((x) => x + x).join('');
+      }
+      const num = parseInt(c, 16);
+      if (isNaN(num)) return [0, 0, 0, 255];
+      return [(num >> 16) & 255, (num >> 8) & 255, num & 255, 255];
+    };
+
+    // Scanline flood fill algorithm
+    const executeFloodFill = (pt: Point) => {
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (!ctx) return;
+
+      const dpr = dprRef.current;
+      const startX = Math.floor(pt.x * dpr);
+      const startY = Math.floor(pt.y * dpr);
+
+      const width = canvas.width;
+      const height = canvas.height;
+
+      if (startX < 0 || startX >= width || startY < 0 || startY >= height) return;
+
+      const imgData = ctx.getImageData(0, 0, width, height);
+      const data = imgData.data;
+
+      const startIdx = (startY * width + startX) * 4;
+      const startR = data[startIdx];
+      const startG = data[startIdx + 1];
+      const startB = data[startIdx + 2];
+      const startA = data[startIdx + 3];
+
+      const targetColorHex = isEraserRef.current ? '#ffffff' : currentColorRef.current;
+      const [fillR, fillG, fillB, fillA] = hexToRgba(targetColorHex);
+
+      // Check if start color is already identical or very close to fill color
+      const initialDiff =
+        Math.abs(startR - fillR) +
+        Math.abs(startG - fillG) +
+        Math.abs(startB - fillB) +
+        Math.abs(startA - fillA);
+      if (initialDiff <= 8) {
+        return;
+      }
+
+      // Color match with generous tolerance for anti-aliasing gradient coverage
+      const tolerance = 96;
+      const matchStartColor = (idx: number) => {
+        const dr = Math.abs(data[idx] - startR);
+        const dg = Math.abs(data[idx + 1] - startG);
+        const db = Math.abs(data[idx + 2] - startB);
+        const da = Math.abs(data[idx + 3] - startA);
+        return dr + dg + db + da <= tolerance;
+      };
+
+      const visited = new Uint8Array(width * height);
+      const queue: [number, number][] = [[startX, startY]];
+      visited[startY * width + startX] = 1;
+
+      while (queue.length > 0) {
+        const [x, y] = queue.pop()!;
+
+        // Scan left
+        let left = x;
+        while (left > 0) {
+          const nextIdx = y * width + (left - 1);
+          if (visited[nextIdx] || !matchStartColor(nextIdx * 4)) break;
+          left--;
+          visited[nextIdx] = 1;
+        }
+
+        // Scan right
+        let right = x;
+        while (right < width - 1) {
+          const nextIdx = y * width + (right + 1);
+          if (visited[nextIdx] || !matchStartColor(nextIdx * 4)) break;
+          right++;
+          visited[nextIdx] = 1;
+        }
+
+        // Fill span [left, right]
+        for (let i = left; i <= right; i++) {
+          const idx = (y * width + i) * 4;
+          data[idx] = fillR;
+          data[idx + 1] = fillG;
+          data[idx + 2] = fillB;
+          data[idx + 3] = fillA;
+          visited[y * width + i] = 1;
+        }
+
+        // Check row above and row below
+        for (const nextY of [y - 1, y + 1]) {
+          if (nextY < 0 || nextY >= height) continue;
+          let inSpan = false;
+          for (let i = left; i <= right; i++) {
+            const pIdx = nextY * width + i;
+            if (!visited[pIdx] && matchStartColor(pIdx * 4)) {
+              if (!inSpan) {
+                queue.push([i, nextY]);
+                visited[pIdx] = 1;
+                inSpan = true;
+              }
+            } else {
+              inSpan = false;
+            }
+          }
+        }
+      }
+
+      // Area Expansion / Dilation:
+      // Expands the filled region by 2-3 canvas pixels into the stroke's anti-aliasing fringe,
+      // completely eliminating unpainted gaps (white halos) between fill and outer outlines.
+      const expandRadius = Math.max(2, Math.round(1.5 * dpr));
+      let currentEdge: number[] = [];
+
+      for (let y = 0; y < height; y++) {
+        const yOffset = y * width;
+        for (let x = 0; x < width; x++) {
+          const idx = yOffset + x;
+          if (visited[idx] === 1) {
+            if (
+              (x > 0 && visited[idx - 1] === 0) ||
+              (x < width - 1 && visited[idx + 1] === 0) ||
+              (y > 0 && visited[idx - width] === 0) ||
+              (y < height - 1 && visited[idx + width] === 0)
+            ) {
+              currentEdge.push(idx);
+            }
+          }
+        }
+      }
+
+      for (let step = 0; step < expandRadius; step++) {
+        const nextEdge: number[] = [];
+        for (let k = 0; k < currentEdge.length; k++) {
+          const p = currentEdge[k];
+          const px = p % width;
+          const py = Math.floor(p / width);
+
+          const neighbors = [
+            px > 0 ? p - 1 : -1,
+            px < width - 1 ? p + 1 : -1,
+            py > 0 ? p - width : -1,
+            py < height - 1 ? p + width : -1,
+          ];
+
+          for (let n = 0; n < 4; n++) {
+            const nIdx = neighbors[n];
+            if (nIdx !== -1 && visited[nIdx] === 0) {
+              visited[nIdx] = 2;
+              const dIdx = nIdx * 4;
+              data[dIdx] = fillR;
+              data[dIdx + 1] = fillG;
+              data[dIdx + 2] = fillB;
+              data[dIdx + 3] = fillA;
+              nextEdge.push(nIdx);
+            }
+          }
+        }
+        currentEdge = nextEdge;
+        if (currentEdge.length === 0) break;
+      }
+
+      ctx.putImageData(imgData, 0, 0);
+      pushHistorySnapshot();
+    };
+
     // Attach native DOM event listeners
     useEffect(() => {
       const canvas = canvasRef.current;
@@ -280,13 +457,19 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>
 
       const onPointerDown = (e: PointerEvent) => {
         if (e.pointerType === 'mouse' && e.button !== 0) return;
+        e.preventDefault();
+        const pt = getCoordinatesFromEvent(e);
+
+        if (isFillRef.current) {
+          executeFloodFill(pt);
+          return;
+        }
+
         try {
           canvas.setPointerCapture(e.pointerId);
         } catch {
           // Ignore
         }
-        e.preventDefault();
-        const pt = getCoordinatesFromEvent(e);
         startDrawing(pt);
       };
 
@@ -470,7 +653,9 @@ export const DrawingCanvas = forwardRef<DrawingCanvasHandle, DrawingCanvasProps>
     return (
       <div
         ref={containerRef}
-        className="w-full h-full relative overflow-hidden bg-white touch-none cursor-crosshair select-none"
+        className={`w-full h-full relative overflow-hidden bg-white touch-none select-none ${
+          isFill ? 'cursor-cell' : 'cursor-crosshair'
+        }`}
       >
         <canvas
           ref={canvasRef}

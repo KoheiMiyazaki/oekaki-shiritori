@@ -28,6 +28,7 @@ export default function App() {
   // Drawing tool state (Default: Black color, 2nd thickest brush size)
   const [currentColor, setCurrentColor] = useState<string>(DEFAULT_COLOR);
   const [isEraser, setIsEraser] = useState<boolean>(false);
+  const [isFill, setIsFill] = useState<boolean>(false);
   const [brushSize, setBrushSize] = useState<number>(DEFAULT_BRUSH_SIZE);
   const [customColors, setCustomColors] = useState<string[]>([]);
 
@@ -47,9 +48,14 @@ export default function App() {
   // Initialize state: Preserve history across app sessions; load existing history and turn
   useEffect(() => {
     const loadedHistory = storage.getHistory();
-    setHistory(loadedHistory);
+    // Ensure existing storage data is cleanly indexed 1..N
+    const sorted = [...loadedHistory].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+    const reindexed = sorted.map((item, idx) => ({ ...item, turn: idx + 1 }));
+    storage.safeSaveHistory(reindexed);
+    setHistory(reindexed);
 
-    const savedTurn = storage.getCurrentTurn();
+    const savedTurn = reindexed.length + 1;
+    storage.setCurrentTurn(savedTurn);
     setTurn(savedTurn);
 
     const loadedCustomColors = storage.getCustomColors();
@@ -80,6 +86,18 @@ export default function App() {
 
   const handleToggleEraser = () => {
     setIsEraser((prev) => !prev);
+    setIsFill(false);
+  };
+
+  const handleToggleFill = () => {
+    setIsFill((prev) => !prev);
+    setIsEraser(false);
+  };
+
+  const handleSelectBrushSize = (size: number) => {
+    setBrushSize(size);
+    setIsEraser(false);
+    setIsFill(false);
   };
 
   const handleAddCustomColor = (newColor: string) => {
@@ -135,7 +153,7 @@ export default function App() {
   const handleNextTurn = () => {
     const newRecord: DrawingRecord = {
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-      turn,
+      turn: history.length + 1,
       timestamp: Date.now(),
       thumbnail: completedImage,
     };
@@ -143,7 +161,7 @@ export default function App() {
     const updatedHistory = storage.saveDrawing(newRecord);
     setHistory(updatedHistory);
 
-    const nextTurnNumber = turn + 1;
+    const nextTurnNumber = updatedHistory.length + 1;
     storage.setCurrentTurn(nextTurnNumber);
     setTurn(nextTurnNumber);
 
@@ -170,7 +188,9 @@ export default function App() {
   const handleDeleteRecord = (id: string) => {
     const updated = storage.deleteDrawing(id);
     setHistory(updated);
-    triggerToast('え を けしたよ');
+    const newTurn = updated.length + 1;
+    setTurn(newTurn);
+    storage.setCurrentTurn(newTurn);
   };
 
   // Smooth transition from Title to Game with 1-second gradual black screen fade
@@ -198,6 +218,7 @@ export default function App() {
               ref={canvasRef}
               currentColor={currentColor}
               isEraser={isEraser}
+              isFill={isFill}
               brushSize={brushSize}
               onStrokeChange={handleStrokeChange}
             />
@@ -274,11 +295,13 @@ export default function App() {
           <ColorPalette
             currentColor={currentColor}
             isEraser={isEraser}
+            isFill={isFill}
             brushSize={brushSize}
             customColors={customColors}
             onSelectColor={handleSelectColor}
             onToggleEraser={handleToggleEraser}
-            onSelectBrushSize={setBrushSize}
+            onToggleFill={handleToggleFill}
+            onSelectBrushSize={handleSelectBrushSize}
             onAddCustomColor={handleAddCustomColor}
             onRemoveCustomColor={handleRemoveCustomColor}
             onCompleteDrawing={handleCompleteDrawing}

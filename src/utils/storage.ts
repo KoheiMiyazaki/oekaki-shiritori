@@ -52,8 +52,15 @@ export const storage = {
       if (updated.length > MAX_HISTORY_ITEMS) {
         updated = updated.slice(updated.length - MAX_HISTORY_ITEMS);
       }
-      this.safeSaveHistory(updated);
-      return updated;
+      // Re-index sequentially 1..N in chronological order
+      const sorted = [...updated].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+      const reindexed = sorted.map((item, idx) => ({
+        ...item,
+        turn: idx + 1,
+      }));
+      this.safeSaveHistory(reindexed);
+      this.setCurrentTurn(reindexed.length + 1);
+      return reindexed;
     } catch (e) {
       console.error('Failed to save drawing', e);
       return this.getHistory();
@@ -63,9 +70,17 @@ export const storage = {
   deleteDrawing(id: string): DrawingRecord[] {
     try {
       const current = this.getHistory();
-      const updated = current.filter((item) => item.id !== id);
-      this.safeSaveHistory(updated);
-      return updated;
+      const filtered = current.filter((item) => item.id !== id);
+      // Re-index sequentially 1..N in chronological order
+      const sorted = [...filtered].sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+      const reindexed = sorted.map((item, idx) => ({
+        ...item,
+        turn: idx + 1,
+      }));
+      this.safeSaveHistory(reindexed);
+      const nextTurn = reindexed.length + 1;
+      this.setCurrentTurn(nextTurn);
+      return reindexed;
     } catch (e) {
       console.error('Failed to delete drawing', e);
       return this.getHistory();
@@ -83,17 +98,8 @@ export const storage = {
 
   getCurrentTurn(): number {
     try {
-      const saved = localStorage.getItem(CURRENT_TURN_KEY);
-      if (saved) {
-        const parsed = parseInt(saved, 10);
-        if (!isNaN(parsed) && parsed > 0) return parsed;
-      }
       const history = this.getHistory();
-      if (history.length > 0) {
-        const maxTurn = Math.max(...history.map((h) => h.turn || 0));
-        return maxTurn + 1;
-      }
-      return 1;
+      return history.length + 1;
     } catch {
       return 1;
     }
